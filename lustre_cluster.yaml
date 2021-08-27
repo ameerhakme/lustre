@@ -229,6 +229,12 @@ Resources:
                 - ''
                 - - |
                     #!/bin/bash -xe
+                  - | 
+                    sudo su 
+                  - | 
+                    sudo wget https://raw.githubusercontent.com/ameerhakme/lustre/main/script.sh
+                  - | 
+                    sudo bash script.sh 
     Properties:
       InstanceType: !Sub '${LustreInstanceType}'
       ImageId: ami-090752db91893874f
@@ -245,6 +251,8 @@ Resources:
               #!/bin/bash -xe
             - |
               sudo yum update -y
+            - | 
+              sudo yum install -y wget
             - |
               sudo yum install -y epel-release
             - |
@@ -287,7 +295,7 @@ Resources:
   
   EC2InstanceMetadataNode:
     Type: 'AWS::EC2::Instance'
-    DependsOn: ParallelFileSystemV1NATRout
+    DependsOn: EC2InstanceManagementNode
     CreationPolicy:
       ResourceSignal:
         Count: 1
@@ -304,6 +312,12 @@ Resources:
                 - ''
                 - - |
                     #!/bin/bash -xe
+                  - | 
+                    sudo su 
+                  - | 
+                    sudo wget https://raw.githubusercontent.com/ameerhakme/lustre/main/script.sh
+                  - | 
+                    sudo bash script.sh 
     Properties:
       InstanceType: !Sub '${LustreInstanceType}'
       ImageId: ami-090752db91893874f
@@ -320,6 +334,8 @@ Resources:
               #!/bin/bash -xe
             - |
               sudo yum update -y
+            - | 
+              sudo yum install -y wget
             - |
               sudo yum install -y epel-release
             - |
@@ -361,7 +377,7 @@ Resources:
   
   EC2InstanceClientNode:
     Type: 'AWS::EC2::Instance'
-    DependsOn: ParallelFileSystemV1NATRout
+    DependsOn: [EC2InstanceManagementNode, EC2InstanceMetadataNode, EC2InstanceOSS1Node, EC2InstanceOSS2Node, EC2InstanceOSS3Node]
     CreationPolicy:
       ResourceSignal:
         Count: 1
@@ -378,9 +394,15 @@ Resources:
                 - ''
                 - - |
                     #!/bin/bash -xe
+                  - | 
+                    sudo su 
+                  - | 
+                    sudo wget https://raw.githubusercontent.com/ameerhakme/lustre/main/script.sh
+                  - | 
+                    sudo bash script.sh 
     Properties:
       InstanceType: !Sub '${LustreInstanceType}'
-      ImageId: ami-0803ff32d3ca5ddc6
+      ImageId: ami-0ba5adcea3e63c2a9
       KeyName: !Sub '${SSHKeyName}'
       NetworkInterfaces:
       - NetworkInterfaceId:
@@ -394,6 +416,8 @@ Resources:
               #!/bin/bash -xe
             - |
               sudo yum update -y
+            - | 
+              sudo yum install -y wget
             - |
               sudo yum install -y epel-release
             - |
@@ -435,7 +459,7 @@ Resources:
   
   EC2InstanceOSS1Node:
     Type: 'AWS::EC2::Instance'
-    DependsOn: ParallelFileSystemV1NATRout
+    DependsOn: EC2InstanceManagementNode
     CreationPolicy:
       ResourceSignal:
         Count: 1
@@ -452,6 +476,12 @@ Resources:
                 - ''
                 - - |
                     #!/bin/bash -xe
+                  - | 
+                    sudo su 
+                  - | 
+                    sudo wget https://raw.githubusercontent.com/ameerhakme/lustre/main/script.sh
+                  - | 
+                    sudo bash script.sh 
     Properties:
       InstanceType: !Sub '${LustreInstanceType}'
       ImageId: ami-090752db91893874f
@@ -468,6 +498,8 @@ Resources:
               #!/bin/bash -xe
             - |
               sudo yum update -y
+            - | 
+              sudo yum install -y wget
             - |
               sudo yum install -y epel-release
             - |
@@ -509,7 +541,7 @@ Resources:
   
   EC2InstanceOSS2Node:
     Type: 'AWS::EC2::Instance'
-    DependsOn: ParallelFileSystemV1NATRout
+    DependsOn: EC2InstanceManagementNode
     CreationPolicy:
       ResourceSignal:
         Count: 1
@@ -526,6 +558,12 @@ Resources:
                 - ''
                 - - |
                     #!/bin/bash -xe
+                  - | 
+                    sudo su 
+                  - | 
+                    sudo wget https://raw.githubusercontent.com/ameerhakme/lustre/main/script.sh
+                  - | 
+                    sudo bash script.sh 
     Properties:
       InstanceType: !Sub '${LustreInstanceType}'
       ImageId: ami-090752db91893874f
@@ -542,6 +580,8 @@ Resources:
               #!/bin/bash -xe
             - |
               sudo yum update -y
+            - | 
+              sudo yum install -y wget 
             - |
               sudo yum install -y epel-release
             - |
@@ -583,7 +623,7 @@ Resources:
   
   EC2InstanceOSS3Node:
     Type: 'AWS::EC2::Instance'
-    DependsOn: ParallelFileSystemV1NATRout
+    DependsOn: EC2InstanceManagementNode
     CreationPolicy:
       ResourceSignal:
         Count: 1
@@ -600,6 +640,12 @@ Resources:
                 - ''
                 - - |
                     #!/bin/bash -xe
+                  - | 
+                    sudo su 
+                  - | 
+                    sudo wget https://raw.githubusercontent.com/ameerhakme/lustre/main/script.sh
+                  - | 
+                    sudo bash script.sh 
     Properties:
       InstanceType: !Sub '${LustreInstanceType}'
       ImageId: ami-090752db91893874f
@@ -616,6 +662,8 @@ Resources:
               #!/bin/bash -xe
             - |
               sudo yum update -y
+            - | 
+              sudo yum install -y wget
             - |
               sudo yum install -y epel-release
             - |
