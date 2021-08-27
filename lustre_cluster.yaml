@@ -1,0 +1,664 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'The CloudFormation template will deploy Lustre parallel virtual file system. Internally it deploys 6 EC2 instances (One Management, one Client node, one Metadata node, and three OSS nodes) inside a private subnet, and a single bastion host inside a public subnet. Admis can access the Lustre client node via SSH from the bastion host'
+Parameters:
+    SSHKeyName:
+        Description: Amazon EC2 Key Pair for JumpHost instance
+        Type: "AWS::EC2::KeyPair::KeyName"
+    LustreInstanceType:
+        Description: Management/T2 instance 
+        Type: String
+        Default: d3en.2xlarge
+        AllowedValues:
+            - d3en.2xlarge
+            - i3en.12xlarge
+    BastionhostType:
+        Description: Bastion host
+        Type: String
+        Default: m5n.large
+        AllowedValues:
+            - m5n.large
+            - m5n.2xlarge
+            - m5n.4xlarge
+Resources:
+  ParallelFileSystemV1VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemV1VPC
+  
+  ParallelFileSystemV1IGW:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemV1IGW
+  
+  AttachGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref ParallelFileSystemV1VPC
+      InternetGatewayId: !Ref ParallelFileSystemV1IGW
+  
+  ParallelFileSystemPublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref ParallelFileSystemV1VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemPublicSubnet
+  
+  ParallelFileSystemV1Subnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref ParallelFileSystemV1VPC
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: 'false'
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemV1Subnet
+  
+  ParallelFileSystemNAT:
+   Type: AWS::EC2::NatGateway
+   Properties:
+      AllocationId:
+         Fn::GetAtt:
+         - ParallelFileSystemEIP
+         - AllocationId
+      SubnetId:
+         Ref: ParallelFileSystemPublicSubnet
+      Tags:
+      - Key: Name
+        Value: ParallelFileSystemNAT
+  
+  ParallelFileSystemEIP:
+    DependsOn: AttachGateway
+    Type: AWS::EC2::EIP
+    Properties:
+        Domain: vpc
+  
+  ParallelFileSystemV1PublicRoutTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref ParallelFileSystemV1VPC
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemV1PublicRoute
+  
+  ParallelFileSystemV1PrivateRoutTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref ParallelFileSystemV1VPC
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemV1PrivateRoute
+  
+  ParallelFileSystemV1PublicRout:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref ParallelFileSystemV1PublicRoutTable
+      GatewayId: !Ref ParallelFileSystemV1IGW
+      DestinationCidrBlock: 0.0.0.0/0
+  
+  ParallelFileSystemV1NATRout:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref ParallelFileSystemV1PrivateRoutTable
+      NatGatewayId: !Ref ParallelFileSystemNAT
+      DestinationCidrBlock: 0.0.0.0/0
+  
+  ParallelFileSystemV1PublicSubnetRoutTableAssoc1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref ParallelFileSystemV1PublicRoutTable
+      SubnetId: !Ref ParallelFileSystemPublicSubnet
+  
+  ParallelFileSystemV1PrivateSubnetRoutTableAssoc1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref ParallelFileSystemV1PrivateRoutTable
+      SubnetId: !Ref ParallelFileSystemV1Subnet
+  
+  EC2SecurityGroupPublic: 
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Open App access
+      VpcId: !Ref ParallelFileSystemV1VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemV1EC2SGPublic
+  EC2SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Open App access
+      VpcId: !Ref ParallelFileSystemV1VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 10.0.1.0/24
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 10.0.0.0/24
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemV1EC2SG
+  InstanceLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      RetentionInDays: 7
+  managementNodeInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref FSRole
+  FSRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub 'ParallelFileSystemV1Role-BackupAndRestore-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - 'arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy'
+      Path: /
+  
+  ManagementNodeENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+        Tags:
+        - Key: stack
+          Value: production
+        Description: ManagementNodeENI.
+        SourceDestCheck: 'false'
+        GroupSet: 
+        - !Ref EC2SecurityGroup
+        SubnetId: !Ref ParallelFileSystemV1Subnet
+        PrivateIpAddress: 10.0.0.148
+  
+  EC2InstanceManagementNode:
+    Type: 'AWS::EC2::Instance'
+    DependsOn: ParallelFileSystemV1NATRout
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M
+    Metadata:
+      'AWS::CloudFormation::Init':
+        configSets:
+          default:
+            - configure
+        configure:
+          commands:
+            0-Add-the-BeeGFS-Repo: 
+              command: !Join
+                - ''
+                - - |
+                    #!/bin/bash -xe
+    Properties:
+      InstanceType: !Sub '${LustreInstanceType}'
+      ImageId: ami-090752db91893874f
+      KeyName: !Sub '${SSHKeyName}'
+      NetworkInterfaces:
+      - NetworkInterfaceId:
+         Ref: ManagementNodeENI
+        DeviceIndex: '0'
+      IamInstanceProfile: !Ref managementNodeInstanceProfile
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash -xe
+            - |
+              sudo yum update -y
+            - |
+              sudo yum install -y epel-release
+            - |
+              sudo yum -y install python-pip 
+            - |
+              sudo pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            - cfn-init -v
+            - '         --stack '
+            - !Ref 'AWS::StackName'
+            - '         --resource EC2InstanceManagementNode '
+            - '         --region '
+            - !Ref 'AWS::Region'
+            - '         --configsets default'
+            - |+
+
+            - cfn-signal -e $?
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource EC2InstanceManagementNode'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - |+
+
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemManagementNode
+  
+  MetadataNodeENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+        Tags:
+        - Key: stack
+          Value: production
+        Description: MetadataNodeENI.
+        SourceDestCheck: 'false'
+        GroupSet: 
+        - !Ref EC2SecurityGroup
+        SubnetId: !Ref ParallelFileSystemV1Subnet
+        PrivateIpAddress: 10.0.0.114
+  
+  EC2InstanceMetadataNode:
+    Type: 'AWS::EC2::Instance'
+    DependsOn: ParallelFileSystemV1NATRout
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M 
+    Metadata:
+      'AWS::CloudFormation::Init':
+        configSets:
+          default:
+            - configure
+        configure:
+          commands: 
+            0-Add-the-BeeGFS-Repo: 
+              command: !Join
+                - ''
+                - - |
+                    #!/bin/bash -xe
+    Properties:
+      InstanceType: !Sub '${LustreInstanceType}'
+      ImageId: ami-090752db91893874f
+      KeyName: !Sub '${SSHKeyName}'
+      NetworkInterfaces:
+      - NetworkInterfaceId:
+         Ref: MetadataNodeENI
+        DeviceIndex: '0'
+      IamInstanceProfile: !Ref managementNodeInstanceProfile
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash -xe
+            - |
+              sudo yum update -y
+            - |
+              sudo yum install -y epel-release
+            - |
+              sudo yum -y install python-pip 
+            - |
+              sudo pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            - cfn-init -v
+            - '         --stack '
+            - !Ref 'AWS::StackName'
+            - '         --resource EC2InstanceMetadataNode '
+            - '         --region '
+            - !Ref 'AWS::Region'
+            - '         --configsets default'
+            - |+
+
+            - cfn-signal -e $?
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource EC2InstanceMetadataNode'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - |+
+
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemMetadataNode
+  ClientNodeENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+        Tags:
+        - Key: stack
+          Value: production
+        Description: ClientNodeENI.
+        SourceDestCheck: 'false'
+        GroupSet: 
+        - !Ref EC2SecurityGroup
+        SubnetId: !Ref ParallelFileSystemV1Subnet
+        PrivateIpAddress: 10.0.0.212
+  
+  EC2InstanceClientNode:
+    Type: 'AWS::EC2::Instance'
+    DependsOn: ParallelFileSystemV1NATRout
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M 
+    Metadata:
+      'AWS::CloudFormation::Init':
+        configSets:
+          default:
+            - configure
+        configure:
+          commands: 
+            0-Add-the-BeeGFS-Repo: 
+              command: !Join
+                - ''
+                - - |
+                    #!/bin/bash -xe
+    Properties:
+      InstanceType: !Sub '${LustreInstanceType}'
+      ImageId: ami-0803ff32d3ca5ddc6
+      KeyName: !Sub '${SSHKeyName}'
+      NetworkInterfaces:
+      - NetworkInterfaceId:
+         Ref: ClientNodeENI
+        DeviceIndex: '0'
+      IamInstanceProfile: !Ref managementNodeInstanceProfile
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash -xe
+            - |
+              sudo yum update -y
+            - |
+              sudo yum install -y epel-release
+            - |
+              sudo yum -y install python-pip 
+            - |
+              sudo pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            - cfn-init -v
+            - '         --stack '
+            - !Ref 'AWS::StackName'
+            - '         --resource EC2InstanceClientNode '
+            - '         --region '
+            - !Ref 'AWS::Region'
+            - '         --configsets default'
+            - |+
+
+            - cfn-signal -e $?
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource EC2InstanceClientNode'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - |+
+
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemClientNode
+  OSS1NodeENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+        Tags:
+        - Key: stack
+          Value: production
+        Description: OSS1NodeENI.
+        SourceDestCheck: 'false'
+        GroupSet: 
+        - !Ref EC2SecurityGroup
+        SubnetId: !Ref ParallelFileSystemV1Subnet
+        PrivateIpAddress: 10.0.0.90
+  
+  EC2InstanceOSS1Node:
+    Type: 'AWS::EC2::Instance'
+    DependsOn: ParallelFileSystemV1NATRout
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M
+    Metadata:
+      'AWS::CloudFormation::Init':
+        configSets:
+          default:
+            - configure
+        configure:
+          commands: 
+            0-Add-the-BeeGFS-Repo: 
+              command: !Join
+                - ''
+                - - |
+                    #!/bin/bash -xe
+    Properties:
+      InstanceType: !Sub '${LustreInstanceType}'
+      ImageId: ami-090752db91893874f
+      KeyName: !Sub '${SSHKeyName}'
+      NetworkInterfaces:
+      - NetworkInterfaceId:
+         Ref: OSS1NodeENI
+        DeviceIndex: '0'
+      IamInstanceProfile: !Ref managementNodeInstanceProfile
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash -xe
+            - |
+              sudo yum update -y
+            - |
+              sudo yum install -y epel-release
+            - |
+              sudo yum -y install python-pip 
+            - |
+              sudo pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            - cfn-init -v
+            - '         --stack '
+            - !Ref 'AWS::StackName'
+            - '         --resource EC2InstanceOSS1Node '
+            - '         --region '
+            - !Ref 'AWS::Region'
+            - '         --configsets default'
+            - |+
+
+            - cfn-signal -e $?
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource EC2InstanceOSS1Node'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - |+
+
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemOSS1Node
+  OSS2NodeENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+        Tags:
+        - Key: stack
+          Value: production
+        Description: OSS2NodeENI.
+        SourceDestCheck: 'false'
+        GroupSet: 
+        - !Ref EC2SecurityGroup
+        SubnetId: !Ref ParallelFileSystemV1Subnet
+        PrivateIpAddress: 10.0.0.124
+  
+  EC2InstanceOSS2Node:
+    Type: 'AWS::EC2::Instance'
+    DependsOn: ParallelFileSystemV1NATRout
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M
+    Metadata:
+      'AWS::CloudFormation::Init':
+        configSets:
+          default:
+            - configure
+        configure:
+          commands: 
+            0-Add-the-BeeGFS-Repo: 
+              command: !Join
+                - ''
+                - - |
+                    #!/bin/bash -xe
+    Properties:
+      InstanceType: !Sub '${LustreInstanceType}'
+      ImageId: ami-090752db91893874f
+      KeyName: !Sub '${SSHKeyName}'
+      NetworkInterfaces:
+      - NetworkInterfaceId:
+         Ref: OSS2NodeENI
+        DeviceIndex: '0'
+      IamInstanceProfile: !Ref managementNodeInstanceProfile
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash -xe
+            - |
+              sudo yum update -y
+            - |
+              sudo yum install -y epel-release
+            - |
+              sudo yum -y install python-pip 
+            - |
+              sudo pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            - cfn-init -v
+            - '         --stack '
+            - !Ref 'AWS::StackName'
+            - '         --resource EC2InstanceOSS2Node '
+            - '         --region '
+            - !Ref 'AWS::Region'
+            - '         --configsets default'
+            - |+
+
+            - cfn-signal -e $?
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource EC2InstanceOSS2Node'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - |+
+
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemOSS2Node
+  OSS3NodeENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+        Tags:
+        - Key: stack
+          Value: production
+        Description: OSS3NodeENI.
+        SourceDestCheck: 'false'
+        GroupSet: 
+        - !Ref EC2SecurityGroup
+        SubnetId: !Ref ParallelFileSystemV1Subnet
+        PrivateIpAddress: 10.0.0.78
+  
+  EC2InstanceOSS3Node:
+    Type: 'AWS::EC2::Instance'
+    DependsOn: ParallelFileSystemV1NATRout
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M
+    Metadata:
+      'AWS::CloudFormation::Init':
+        configSets:
+          default:
+            - configure
+        configure:
+          commands: 
+            0-Add-the-BeeGFS-Repo: 
+              command: !Join
+                - ''
+                - - |
+                    #!/bin/bash -xe
+    Properties:
+      InstanceType: !Sub '${LustreInstanceType}'
+      ImageId: ami-090752db91893874f
+      KeyName: !Sub '${SSHKeyName}'
+      NetworkInterfaces:
+      - NetworkInterfaceId:
+         Ref: OSS3NodeENI
+        DeviceIndex: '0'
+      IamInstanceProfile: !Ref managementNodeInstanceProfile
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash -xe
+            - |
+              sudo yum update -y
+            - |
+              sudo yum install -y epel-release
+            - |
+              sudo yum -y install python-pip 
+            - |
+              sudo pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            - cfn-init -v
+            - '         --stack '
+            - !Ref 'AWS::StackName'
+            - '         --resource EC2InstanceOSS3Node '
+            - '         --region '
+            - !Ref 'AWS::Region'
+            - '         --configsets default'
+            - |+
+
+            - cfn-signal -e $?
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource EC2InstanceOSS3Node'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - |+
+
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemOSS3Node
+  
+  EC2InstanceBastionhost:
+    Type: 'AWS::EC2::Instance'
+    DependsOn: AttachGateway
+    Properties:
+      InstanceType: !Sub '${BastionhostType}'
+      ImageId: ami-090752db91893874f
+      KeyName: !Sub '${SSHKeyName}'
+      SubnetId: !Ref ParallelFileSystemPublicSubnet
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroupPublic
+      IamInstanceProfile: !Ref managementNodeInstanceProfile
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash -xe
+      Tags:
+        - Key: Name
+          Value: ParallelFileSystemBastionHost
