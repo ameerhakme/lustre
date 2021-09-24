@@ -193,6 +193,46 @@ __EOF
     lfs check servers
 
     lfs df -h
+    yum -y install \
+        libs3-devel \
+        libconfig-devel \
+        libconfig-devel \
+        libyaml-devel \
+        kernel-devel \
+        lz4-devel \
+        libbsd-devel \
+        openssl-devel \
+        git \
+        curl-devel \
+        libxml2-devel\
+        wget
+        
+    ###Install HSM S3 CopyTool 
+    
+    yum -y group install "Development Tools" 
+
+    wget https://github.com/Kitware/CMake/releases/download/v3.21.3/cmake-3.21.3.tar.gz 
+
+    tar zxvf cmake-3.21.3.tar.gz 
+
+    cd cmake-3.21.3
+    ./bootstrap --prefix=/usr/local
+    make -j$(nproc)
+    make install
+
+    cd ..
+
+    git clone https://git.ichec.ie/performance/storage/estuary.git 
+
+    cd estuary
+
+    mkdir build
+
+    cd build
+     
+    /usr/local/bin/cmake ..
+
+    make 
 
 else 
     echo "Something wrong" >> out
