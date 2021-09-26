@@ -237,9 +237,9 @@ __EOF
     make 
 
 cat >/tmp/config.cfg <<\__EOF
-access_key = "$1";
-secret_key = "$2";
-host = "$3.s3.amazonaws.com";
+access_key = "$accesskey";
+secret_key = "$secretaccesskey";
+host = "$s3bucket.s3.amazonaws.com";
 bucket_prefix = "lustrebucket";
 bucket_count = 1;
 chunk_size = 104857600;
