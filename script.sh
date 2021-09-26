@@ -188,6 +188,16 @@ if [ ! -c /dev/lnet ] ; then
 fi
 __EOF
 
+cat >/tmp/config.cfg <<\__EOF
+access_key = "$accesskey";
+secret_key = "$secretaccesskey";
+host = "$s3bucket.s3.amazonaws.com";
+bucket_prefix = "lustrebucket";
+bucket_count = 1;
+chunk_size = 104857600;
+ssl = true
+__EOF
+
     mkdir /lustrefs 
     mount -t lustre mgs@tcp0:/lustrefs /lustrefs
 
@@ -236,16 +246,8 @@ __EOF
 
     make 
 
-cat >/tmp/config.cfg <<\__EOF
-access_key = "$accesskey";
-secret_key = "$secretaccesskey";
-host = "$s3bucket.s3.amazonaws.com";
-bucket_prefix = "lustrebucket";
-bucket_count = 1;
-chunk_size = 104857600;
-ssl = true
-__EOF
-\cp /tmp/config.cfg /home/centos/estuary/config.cfg
+
+    \cp /tmp/config.cfg /home/centos/estuary/config.cfg
 
 else 
     echo "Something wrong" >> out
