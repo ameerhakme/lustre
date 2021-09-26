@@ -1,6 +1,14 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: 'The CloudFormation template will deploy Lustre parallel virtual file system. Internally it deploys 6 EC2 instances (One Management, one Client node, one Metadata node, and three OSS nodes) inside a private subnet, and a single bastion host inside a public subnet. Admis can access the Lustre client node via SSH from the bastion host'
 Parameters:
+    Password:
+      NoEcho: 'true'
+      Type: String
+      Description: New account password
+      MinLength: '1'
+      MaxLength: '41'
+      ConstraintDescription: the password must be between 1 and 41 characters
+
     SSHKeyName:
         Description: Amazon EC2 Key Pair for JumpHost instance
         Type: "AWS::EC2::KeyPair::KeyName"
@@ -20,6 +28,33 @@ Parameters:
             - m5n.2xlarge
             - m5n.4xlarge
 Resources:
+  S3User:
+    Type: AWS::IAM::User
+    Properties:
+      LoginProfile:
+        Password: !Ref 'Password'
+  S3AdminGroup:
+    Type: AWS::IAM::Group
+  Admins:
+    Type: AWS::IAM::UserToGroupAddition
+    Properties:
+      GroupName: !Ref 'S3AdminGroup'
+      Users: [!Ref 'S3User']
+  S3dminPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: S3Admins
+      PolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action: '*'
+          Resource: '*'
+      Groups: [!Ref 'S3AdminGroup']
+  S3Keys:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref 'S3User'
+
   ParallelFileSystemV1VPC:
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -209,7 +244,59 @@ Resources:
         - !Ref EC2SecurityGroup
         SubnetId: !Ref ParallelFileSystemV1Subnet
         PrivateIpAddress: 10.0.0.148
+  S3Endpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: !Ref S3Bucket 
+      RouteTableIds:
+        - !Ref ParallelFileSystemV1PrivateRoutTable
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcId: !Ref ParallelFileSystemV1VPC
   
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join
+        - "-"
+        - - "lustre-hsm-archive"
+          - !Select
+            - 0
+            - !Split
+              - "-"
+              - !Select
+                - 2
+                - !Split
+                  - "/"
+                  - !Ref "AWS::StackId"
+  
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: Deny
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref S3Bucket
+                - /*
+            Principal: '*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref S3Endpoint 
+      
   EC2InstanceManagementNode:
     Type: 'AWS::EC2::Instance'
     DependsOn: ParallelFileSystemV1NATRout
@@ -395,11 +482,22 @@ Resources:
                 - - |
                     #!/bin/bash -xe
                   - | 
+                  - export s3bucket=
+                  - !Ref 'S3Bucket' 
+                  - | 
+                  - export accesskey= 
+                  - !Ref 'S3Keys'
+                  - | 
+                  - export secretaccesskey=
+                  - !GetAtt S3Keys.SecretAccessKey
+                  - |+
+
+                  - | 
                     sudo su 
                   - | 
                     sudo wget https://raw.githubusercontent.com/ameerhakme/lustre/main/script.sh
                   - | 
-                    sudo bash script.sh 
+                    sudo bash script.sh $accesskey $secretaccesskey $s3bucket
     Properties:
       InstanceType: !Sub '${LustreInstanceType}'
       ImageId: ami-0ba5adcea3e63c2a9
@@ -710,3 +808,10 @@ Resources:
       Tags:
         - Key: Name
           Value: ParallelFileSystemBastionHost
+Outputs:
+  AccessKey:
+    Value: !Ref 'S3Keys'
+    Description: AWSAccessKeyId of new user
+  SecretKey:
+    Value: !GetAtt [S3Keys, SecretAccessKey]
+    Description: AWSSecretAccessKey of new user

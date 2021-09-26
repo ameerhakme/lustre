@@ -1,5 +1,8 @@
 #!/bin/bash
 
+export accesskey=$1
+export secretaccesskey=$2
+export s3bucket=$3 
 export client="10.0.0.212"  
 export mgs="10.0.0.148"  
 export mds="10.0.0.114"  
@@ -232,6 +235,17 @@ __EOF
     /usr/local/bin/cmake ..
 
     make 
+
+cat >/tmp/config.cfg <<\__EOF
+access_key = "$1";
+secret_key = "$2";
+host = "$3.s3.amazonaws.com";
+bucket_prefix = "lustrebucket";
+bucket_count = 1;
+chunk_size = 104857600;
+ssl = true
+__EOF
+\cp /tmp/config.cfg /home/centos/estuary/config.cfg
 
 else 
     echo "Something wrong" >> out
