@@ -247,7 +247,7 @@ __EOF
     make 
 
 
-    \cp /tmp/config.cfg /home/centos/estuary/config.cfg
+    \cp /tmp/config.cfg /estuary/config.cfg
 
 else 
     echo "Something wrong" >> out

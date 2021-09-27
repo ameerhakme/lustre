@@ -253,7 +253,7 @@ Resources:
           - Effect: Allow
             Principal: '*'
             Action: '*'
-            Resource: !Ref S3Bucket 
+            Resource: '*'
       RouteTableIds:
         - !Ref ParallelFileSystemV1PrivateRoutTable
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
