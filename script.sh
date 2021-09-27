@@ -3,6 +3,10 @@
 export accesskey=$1
 export secretaccesskey=$2
 export s3bucket=$3 
+echo $accesskey >> accesskey
+echo $secretaccesskey >> secretaccesskey
+echo $s3bucket >> s3bucket
+
 export client="10.0.0.212"  
 export mgs="10.0.0.148"  
 export mds="10.0.0.114"  

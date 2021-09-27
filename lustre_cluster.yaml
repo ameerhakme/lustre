@@ -217,7 +217,7 @@ Resources:
   FSRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: !Sub 'ParallelFileSystemV1Role-BackupAndRestore-${AWS::Region}'
+      RoleName: !Sub 'ParallelFileSystemV1Role-Lustre-${AWS::Region}'
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -230,6 +230,7 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
         - 'arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
       Path: /
   
   ManagementNodeENI:
@@ -311,7 +312,7 @@ Resources:
             - configure
         configure:
           commands:
-            0-Add-the-BeeGFS-Repo: 
+            0-Add-the-Lustre-Repo: 
               command: !Join
                 - ''
                 - - |
@@ -394,7 +395,7 @@ Resources:
             - configure
         configure:
           commands: 
-            0-Add-the-BeeGFS-Repo: 
+            0-Add-the-Lustre-Repo: 
               command: !Join
                 - ''
                 - - |
@@ -476,7 +477,7 @@ Resources:
             - configure
         configure:
           commands: 
-            0-Add-the-BeeGFS-Repo: 
+            0-Add-the-Lustre-Repo: 
               command: !Join
                 - ''
                 - - |
@@ -569,7 +570,7 @@ Resources:
             - configure
         configure:
           commands: 
-            0-Add-the-BeeGFS-Repo: 
+            0-Add-the-Lustre-Repo: 
               command: !Join
                 - ''
                 - - |
@@ -651,7 +652,7 @@ Resources:
             - configure
         configure:
           commands: 
-            0-Add-the-BeeGFS-Repo: 
+            0-Add-the-Lustre-Repo: 
               command: !Join
                 - ''
                 - - |
@@ -733,7 +734,7 @@ Resources:
             - configure
         configure:
           commands: 
-            0-Add-the-BeeGFS-Repo: 
+            0-Add-the-Lustre-Repo: 
               command: !Join
                 - ''
                 - - |
