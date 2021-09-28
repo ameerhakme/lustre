@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: 'The CloudFormation template will deploy Lustre parallel virtual file system. Internally it deploys 6 EC2 instances (One Management, one Client node, one Metadata node, and three OSS nodes) inside a private subnet, and a single bastion host inside a public subnet. Admis can access the Lustre client node via SSH from the bastion host'
+Description: 'The CloudFormation template will deploy Lustre parallel virtual file system. Internally it deploys 6 EC2 instances (One Management, one Client node, one Metadata node, and three OSS nodes) inside a private subnet, and a single bastion host inside a public subnet. Admis can access the Lustre client node via SSH from the bastion host. The template will also deploy an S3 bucket that can be used as an arvhive using HSM CopyTool. The S3 bucket will be accessed using an S3 endpoint'
 Parameters:
     Password:
       NoEcho: 'true'
