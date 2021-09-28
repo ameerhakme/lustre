@@ -1,11 +1,5 @@
 #!/bin/bash
 
-export accesskey=$1
-export secretaccesskey=$2
-export s3bucket=$3 
-echo $accesskey >> accesskey
-echo $secretaccesskey >> secretaccesskey
-echo $s3bucket >> s3bucket
 
 export client="10.0.0.212"  
 export mgs="10.0.0.148"  
@@ -193,9 +187,9 @@ fi
 __EOF
 
 cat >/tmp/config.cfg <<\__EOF
-access_key = "$accesskey";
-secret_key = "$secretaccesskey";
-host = "$s3bucket.s3.amazonaws.com";
+access_key = "";
+secret_key = "";
+host = "<bucketname>.s3.amazonaws.com";
 bucket_prefix = "lustrebucket";
 bucket_count = 1;
 chunk_size = 104857600;

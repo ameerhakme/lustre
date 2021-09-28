@@ -498,7 +498,7 @@ Resources:
                   - | 
                     sudo wget https://raw.githubusercontent.com/ameerhakme/lustre/main/script.sh
                   - | 
-                    sudo bash script.sh $accesskey $secretaccesskey $s3bucket
+                    sudo bash script.sh 
     Properties:
       InstanceType: !Sub '${LustreInstanceType}'
       ImageId: ami-0ba5adcea3e63c2a9
